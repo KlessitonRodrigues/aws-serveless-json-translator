@@ -14,11 +14,14 @@ example: "react.vitejs.styled.md"
 ## New Bootstrap Agent Instructions
 
 - Create a new markdown file under `.github/instructions/bootstrap/` with the agent's name.
-- Save all constants and configuration values and utils code to replicate across projects.
-- Define the necessary dependencies and versions, configurations, and initial file structure.
+- Save the project structure (folders and files) to replicate across projects.
+- Save code examples of constants, configuration, utils functions and tests.
+- Save examples of definition files with dependency and their versions.
+- Save examples of any settings file on root level (e.g., `.eslintrc.js`, `.prettierrc`, etc.).
 
 ## New Development Agent Instructions
 
 - Create a new markdown file under `.github/instructions/development/` with the agent's name.
-- Define instructions for modifying the existing configurations, dependencies, and file structures to accommodate the new features or changes in the agent's functionality.
-- Define project structure for folders and files.
+- Save project structure and few rules for development.
+- Keep it small and focused on the specific development changes needed.
+- Enforce testing and code quality standards for the development changes.
