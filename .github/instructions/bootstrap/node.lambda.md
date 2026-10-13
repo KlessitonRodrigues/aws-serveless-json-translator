@@ -47,34 +47,39 @@ Replace the generated `package.json`:
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
-    "@types/node": "^26.1.1",
-    "aws-cdk": "2.1129.0",
+    "@types/node": "^22.0.0",
+    "aws-cdk": "^2.1000.0",
+    "axios": "^1.20.0",
     "body-parser": "^2.2.2",
     "cors": "^2.8.5",
     "dotenv": "^17.3.1",
+    "esbuild": "^0.25.0",
     "express": "^5.2.1",
     "jest": "^30.2.0",
     "nodemon": "^3.1.0",
     "prettier": "^3.2.5",
-    "ts-jest": "^29.4.11",
+    "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
-    "typescript": "~6.0.3"
+    "typescript": "~5.9.0"
   },
   "dependencies": {
+    "@aws-sdk/client-translate": "^3.700.0",
     "aws-cdk-lib": "^2.238.0",
     "constructs": "^10.5.0",
-    "dynamoose": "^4.2.0",
     "zod": "^4.4.3"
-  },
-  "peerDependencies": {
-    "aws-cdk-lib": "2.137.0",
-    "constructs": "^10.3.0"
   }
 }
 ```
 
 ```bash
 yarn install
+```
+
+The Dynamoose model example in section 10 uses an optional package that is not part
+of the translator service manifest. Install it if you use that example:
+
+```bash
+yarn add dynamoose
 ```
 
 ---
@@ -234,50 +239,60 @@ export default config;
 **`.env`** — never commit this file
 
 ```env
-STACK_NAME="my-service-dev"
-TASK_TABLE_NAME="my-service-dev-task-table-v3"
-TEST_API_URL="https://<your-api-id>.execute-api.<region>.amazonaws.com/prod"
+STACK_NAME="json-translator-dev"
 AWS_REGION="us-east-1"
-AWS_ACCESS_KEY_ID="<your-key-id>"
-AWS_SECRET_ACCESS_KEY="<your-secret-key>"
+TEST_API_URL="http://localhost:3005"
 ```
 
-Add `.env` to `.gitignore`.
+`TEST_API_URL` defaults to `http://localhost:3005`; change it to the deployed
+API URL to run integration tests against AWS. Configure AWS credentials using
+the AWS CLI or another supported AWS SDK credential provider rather than storing
+access keys in `.env`. Add `.env` to `.gitignore`.
 
 ---
 
 ## 8. Directory Structure
 
 ```
-src/
-├── api.ts                         # Express local dev server
-├── stack.ts                       # CDK stack entry point
-├── config/
-│   └── dotenv.ts                  # Loads .env at runtime
-├── constants/
-│   ├── apiMessages.ts             # Standardized response codes/messages
-│   ├── environment.ts             # Typed env vars object
-│   └── resources.ts               # AWS resource name builder
-├── utils/
-│   ├── aws.ts                     # CORS preflight helpers
-│   ├── express.ts                 # Express → Lambda event adapter
-│   ├── lambda.ts                  # Response helpers and types
-│   └── zod.ts                     # Zod DTO factory
-└── lib/
-    ├── dynamodb/
-    │   └── <entity>.table.ts      # DynamoDB Table CDK construct
-    ├── gateway/
-    │   └── <entity>.gateway.ts    # API Gateway CDK construct
-    └── lambda/
-        ├── common/
-        │   └── api.dto.ts         # SuccessDto / ErrorDto
-        └── <entity>/
-            ├── <entity>.lambda.ts # Lambda function CDK constructs
-            ├── <entity>.service.ts # Lambda handlers (business logic)
-            ├── <entity>.model.ts   # Dynamoose schema + model
-            ├── <entity>.dto.ts     # Zod schemas + DTO classes
-            └── <entity>.spec.ts    # Integration tests
+.
+├── cdk.json
+├── .env.example
+├── .gitignore
+├── jest.config.ts
+├── package.json
+├── tsconfig.json
+├── .prettierrc
+└── src/
+    ├── api.ts                     # Express local dev server (POST /translate)
+    ├── stack.ts                   # CDK stack and API Gateway route
+    ├── aws/
+    │   ├── gateway/
+    │   │   └── translate.gateway.ts # API Gateway construct
+    │   └── lambda/
+    │       ├── common/
+    │       │   └── api.dto.ts     # Shared success/error response DTOs
+    │       └── translate/
+    │           ├── translate.dto.ts # Translation request schema
+    │           ├── translate.lambda.ts # Lambda function construct
+    │           ├── translate.service.ts # Translation handler
+    │           └── translate.spec.ts # Axios integration tests
+    ├── config/
+    │   ├── config.dotenv.ts       # Loads .env at runtime
+    │   └── config.express.ts      # Alternate Express API configuration
+    ├── constants/
+    │   ├── constants.environment.ts # Typed environment variables
+    │   ├── constants.messages.ts  # Standardized response messages
+    │   └── constants.resources.ts # AWS resource names
+    └── utils/
+        ├── utils.aws.ts           # CORS preflight helpers
+        ├── utils.express.ts       # Express → Lambda event adapter
+        ├── utils.lambda.ts        # Response helpers and types
+        └── utils.zod.ts           # Zod DTO factory
 ```
+
+Sections 9–11 retain reusable source and task/DynamoDB examples. The task and
+DynamoDB files shown there are optional additions, not part of the translator
+service's current structure.
 
 ---
 
@@ -323,44 +338,24 @@ export const resourceNames = {
 };
 ```
 
-### `src/constants/apiMessages.ts`
+### `src/constants/constants.messages.ts`
+
+The translator keeps API message values as plain strings. Use these constants as
 
 ```typescript
 export const apiMessages = {
-  SUCCESS: { code: "success", message: "Success" },
-  CREATED_SUCCESSFULLY: {
-    code: "created_successfully",
-    message: "Created successfully",
-  },
-  UPDATED_SUCCESSFULLY: {
-    code: "updated_successfully",
-    message: "Updated successfully",
-  },
-  DELETED_SUCCESSFULLY: {
-    code: "deleted_successfully",
-    message: "Deleted successfully",
-  },
-  FETCHED_SUCCESSFULLY: {
-    code: "fetched_successfully",
-    message: "Fetched successfully",
-  },
-  INVALID_REQUEST: { code: "invalid_request", message: "Invalid request" },
-  INTERNAL_SERVER_ERROR: {
-    code: "internal_server_error",
-    message: "Internal server error",
-  },
-  NOT_FOUND: { code: "not_found", message: "Resource not found" },
-  UNAUTHORIZED: { code: "unauthorized", message: "Unauthorized" },
-  DATABASE_ERROR: { code: "database_error", message: "Database error" },
-  VALIDATION_ERROR: { code: "validation_error", message: "Validation error" },
+  SUCCESS: "Success",
+  CREATED_SUCCESSFULLY: "Created successfully",
+  INVALID_REQUEST: "Invalid request",
+  INTERNAL_SERVER_ERROR: "Internal server error",
 };
 ```
 
 ### `src/utils/lambda.ts`
 
 ```typescript
-import { apiMessages } from "../constants/apiMessages";
-import { ErrorDto } from "../lib/lambda/common/api.dto";
+import { apiMessages } from "../constants/constants.messages";
+import { ErrorDto } from "../aws/lambda/common/api.dto";
 
 export type APIGatewayHandler = (event: any) => Promise<any>;
 
@@ -396,7 +391,7 @@ export const createResponse: CreateResponseOptions = (code, data, headers) => {
 export const badRequest = (details: unknown) => {
   return createResponse(
     400,
-    ErrorDto.create({ ...apiMessages.INVALID_REQUEST, details }),
+    ErrorDto.create({ message: apiMessages.INVALID_REQUEST, details }),
   );
 };
 
@@ -406,7 +401,7 @@ export const internalError = (err: any) => {
     500,
     ErrorDto.create({
       details: err.message,
-      ...apiMessages.INTERNAL_SERVER_ERROR,
+      message: apiMessages.INTERNAL_SERVER_ERROR,
     }),
   );
 };
@@ -621,7 +616,7 @@ export class TaskModel {
 ```typescript
 import { z } from "zod";
 
-import { apiMessages } from "../../../constants/apiMessages";
+import { apiMessages } from "../../../constants/constants.messages";
 import {
   APIGatewayHandler,
   badRequest,
@@ -660,7 +655,10 @@ export const findOneTaskService: APIGatewayHandler = async (event) => {
     const task = await taskModel.model.get({ id: pkResult.data });
     if (task && "statusCode" in task) return task;
     if (!task)
-      return createResponse(404, ErrorDto.create({ ...apiMessages.NOT_FOUND }));
+      return createResponse(
+        404,
+        ErrorDto.create({ message: "Resource not found" }),
+      );
 
     const parsed = GetTaskResponseDto.schema.safeParse(task);
     if (!parsed.success) return badRequest(parsed.error.flatten());
@@ -699,7 +697,10 @@ export const updateTaskService: APIGatewayHandler = async (event) => {
     const task = await taskModel.model.get({ id: pkResult.data });
     if (task && "statusCode" in task) return task;
     if (!task)
-      return createResponse(404, ErrorDto.create({ ...apiMessages.NOT_FOUND }));
+      return createResponse(
+        404,
+        ErrorDto.create({ message: "Resource not found" }),
+      );
 
     const updateData = Object.fromEntries(
       Object.entries(dtoResult.data).filter(([, v]) => v !== undefined),
@@ -730,12 +731,15 @@ export const deleteTaskService: APIGatewayHandler = async (event) => {
     const task = await taskModel.model.get({ id: pkResult.data });
     if (task && "statusCode" in task) return task;
     if (!task)
-      return createResponse(404, ErrorDto.create({ ...apiMessages.NOT_FOUND }));
+      return createResponse(
+        404,
+        ErrorDto.create({ message: "Resource not found" }),
+      );
 
     await taskModel.model.delete({ id: pkResult.data });
     return createResponse(
       200,
-      SuccessDto.create({ ...apiMessages.DELETED_SUCCESSFULLY }),
+      SuccessDto.create({ message: "Deleted successfully" }),
     );
   } catch (err: any) {
     return internalError(err);
@@ -1010,166 +1014,110 @@ new NodeTemplateStack(app);
 ### `src/api.ts`
 
 ```typescript
-import "./config/dotenv"; // sort-imports-ignore
+import "./config/config.dotenv"; // sort-imports-ignore
 
-import * as bodyparser from "body-parser";
-import { expressToLambdaEvent } from "./utils/express";
-import * as taskService from "./lib/lambda/tasks/task.service";
+import * as bodyParser from "body-parser";
+
+import { translateJsonService } from "./aws/lambda/translate/translate.service";
+import { expressToLambdaEvent } from "./utils/utils.express";
 
 const express = require("express");
 const cors = require("cors");
 
-const localRoutes = () => {
-  const router = express.Router();
-  router.get("/tasks", expressToLambdaEvent(taskService.findAllTaskService));
-  router.get(
-    "/tasks/:id",
-    expressToLambdaEvent(taskService.findOneTaskService),
-  );
-  router.post("/tasks", expressToLambdaEvent(taskService.createTaskService));
-  router.put("/tasks/:id", expressToLambdaEvent(taskService.updateTaskService));
-  router.delete(
-    "/tasks/:id",
-    expressToLambdaEvent(taskService.deleteTaskService),
-  );
-  return router;
-};
+const app = express();
+const port = 3005;
 
-const localApi = async () => {
-  const app = express();
-  const port = 3005;
-
-  app.use(bodyparser.urlencoded({ extended: false }));
-  app.use(bodyparser.json());
-  app.use(
-    cors({
-      credentials: true,
-      origin: (_: any, callback: any) => callback(null, true),
-    }),
-  );
-  app.use(localRoutes());
-  app.listen(port, () => console.log("Running at: http://localhost:" + port));
-};
-
-localApi();
+app.use(bodyParser.json({ limit: "5mb" }));
+app.use(cors());
+app.post("/translate", expressToLambdaEvent(translateJsonService));
+app.listen(port, () => console.log("Running at: http://localhost:" + port));
 ```
+
+Run the server with `yarn dev`; it listens on port `3005` and serves
+`POST /translate`.
 
 ---
 
 ## 13. Integration Tests
 
-### `src/lib/lambda/<entity>/<entity>.spec.ts`
+### `src/aws/lambda/translate/translate.spec.ts`
 
 ```typescript
-import "../../../config/dotenv"; // sort-imports-ignore
+import "../../../config/config.dotenv"; // sort-imports-ignore
 
 import axios from "axios";
 import { randomUUID } from "crypto";
 
-import dotenv from "../../../constants/environment";
-import { apiMessages } from "../../../constants/apiMessages";
-import { CreateTaskDto, UpdateTaskDto } from "./task.dto";
+import dotenv from "../../../constants/constants.environment";
+import { apiMessages } from "../../../constants/constants.messages";
+import { TranslateJsonDto } from "./translate.dto";
 
-describe("Tasks API", () => {
+describe("Translate API", () => {
   const baseURL = dotenv.TEST_API_URL;
-  if (!baseURL) throw new Error("missing TEST_API_URL");
   const apiClient = axios.create({ baseURL });
 
   const testId = randomUUID().replace(/-/g, "");
-  const createTaskDto: CreateTaskDto = {
-    name: `Test Task ${testId}`,
-    description: `Description for task ${testId}`,
-    status: "pending",
-    priority: "normal",
-    dueDate: "2026-12-31",
-    progressList: [],
+  const testJson = JSON.stringify({
+    message1: `Hello, world! ${testId}`,
+    message2: `How are you? ${testId}`,
+    message3: `Goodbye! ${testId}`,
+  });
+  const translateDto: TranslateJsonDto = {
+    json: testJson,
+    sourceLanguage: "en",
+    targetLanguage: "es",
   };
 
-  let createdTaskId: string;
-
-  it("should create a new task and return 200 status", async () => {
-    const response = await apiClient.post("/tasks", createTaskDto);
+  it("should translate JSON and return 200 status", async () => {
+    const response = await apiClient.post("/translate", translateDto);
     expect(response.status).toBe(200);
-    expect(response.data).toMatchObject({
-      name: createTaskDto.name,
-      status: createTaskDto.status,
-    });
-    createdTaskId = response.data.id;
-    expect(createdTaskId).toBeDefined();
+    expect(response.data).toMatchObject({ message: apiMessages.SUCCESS });
   });
 
-  it("should return 400 status for invalid task data", async () => {
-    await expect(apiClient.post("/tasks", { name: "" })).rejects.toMatchObject({
-      response: { status: 400 },
-    });
-  });
-
-  it("should list all tasks and return 200 status", async () => {
-    const response = await apiClient.get("/tasks");
-    expect(response.status).toBe(200);
-    expect(Array.isArray(response.data)).toBe(true);
-  });
-
-  it("should get a task by id and return 200 status", async () => {
-    const response = await apiClient.get(`/tasks/${createdTaskId}`);
-    expect(response.status).toBe(200);
-    expect(response.data).toMatchObject({ id: createdTaskId });
-  });
-
-  it("should return 400 status for invalid task id", async () => {
+  it("should return 400 for invalid JSON", async () => {
     await expect(
-      apiClient.get("/tasks/not-a-valid-uuid"),
+      apiClient.post("/translate", {
+        ...translateDto,
+        json: "invalid-json",
+      }),
     ).rejects.toMatchObject({
       response: { status: 400 },
     });
   });
 
-  it("should return 404 status for non-existent task", async () => {
-    await expect(apiClient.get(`/tasks/${randomUUID()}`)).rejects.toMatchObject(
-      {
-        response: { status: 404 },
-      },
-    );
-  });
-
-  it("should update a task and return 200 status", async () => {
-    const updateDto: UpdateTaskDto = {
-      name: `Updated Task ${testId}`,
-      status: "in_progress",
-    };
-    const response = await apiClient.put(`/tasks/${createdTaskId}`, updateDto);
-    expect(response.status).toBe(200);
-    expect(response.data).toMatchObject({ id: createdTaskId, ...updateDto });
-  });
-
-  it("should return 404 when updating a non-existent task", async () => {
+  it("should return 400 when required fields are missing", async () => {
     await expect(
-      apiClient.put(`/tasks/${randomUUID()}`, { name: "Ghost" }),
-    ).rejects.toMatchObject({ response: { status: 404 } });
-  });
-
-  it("should delete a task and return 200 status", async () => {
-    const response = await apiClient.delete(`/tasks/${createdTaskId}`);
-    expect(response.status).toBe(200);
-    expect(response.data).toEqual({ ...apiMessages.DELETED_SUCCESSFULLY });
-  });
-
-  it("should return 404 when deleting a non-existent task", async () => {
-    await expect(
-      apiClient.delete(`/tasks/${randomUUID()}`),
+      apiClient.post("/translate", { json: testJson, sourceLanguage: "en" }),
     ).rejects.toMatchObject({
-      response: { status: 404 },
+      response: { status: 400 },
     });
   });
 
-  it("should clean up any test data", async () => {
-    if (!createdTaskId) return;
-    await apiClient.delete(`/tasks/${createdTaskId}`).catch(() => undefined);
+  it("should return 400 for an empty JSON object", async () => {
+    await expect(
+      apiClient.post("/translate", { ...translateDto, json: "{}" }),
+    ).rejects.toMatchObject({
+      response: { status: 400 },
+    });
+  });
+
+  it("should return 400 for an empty target language", async () => {
+    await expect(
+      apiClient.post("/translate", {
+        ...translateDto,
+        targetLanguage: "",
+      }),
+    ).rejects.toMatchObject({
+      response: { status: 400 },
+    });
   });
 });
 ```
 
-> Tests run against the deployed `TEST_API_URL`. Set it in `.env` after deploying.
+`TEST_API_URL` defaults to `http://localhost:3005`, so tests use the local Express
+server by default. Set it to the deployed API URL in `.env` to run against AWS.
+The unique ID is included in the JSON values sent by the successful translation
+test so each run uses distinct input.
 
 ---
 
@@ -1186,17 +1134,18 @@ yarn cdk-synt
 yarn cdk-deploy
 ```
 
-After deploy, copy the API Gateway URL from the output and set it as `TEST_API_URL` in `.env`.
+After deploy, copy the API Gateway URL from the output and set it as
+`TEST_API_URL` in `.env` to run integration tests against the deployed API.
 
 ---
 
 ## 15. Development Workflow
 
 ```bash
-# Local dev (port 3005, uses .env credentials to hit real DynamoDB)
+# Start the local Express API on port 3005
 yarn dev
 
-# Run integration tests against deployed API
+# Run Axios integration tests against TEST_API_URL (localhost by default)
 yarn test
 
 # Coverage report
@@ -1210,28 +1159,25 @@ yarn format
 
 ## 16. Conventions
 
-| Rule                 | Detail                                                                   |
-| -------------------- | ------------------------------------------------------------------------ |
-| Resource names       | All derived from `STACK_NAME` prefix via `resourceNames`                 |
-| Lambda handlers      | Named exports in `<entity>.service.ts`, one per HTTP verb                |
-| Validation           | All input/output validated through Zod schemas in `<entity>.dto.ts`      |
-| Error responses      | Always use `badRequest()` or `internalError()` from `utils/lambda.ts`    |
-| Node modules bundled | List extra npm deps in `nodeModules` array inside `<entity>.lambda.ts`   |
-| Local dev            | Express routes mirror Lambda routes via `expressToLambdaEvent()` adapter |
-| Tests                | Integration only — hit the real deployed API, no mocks                   |
-| Log retention        | 1 week (`RetentionDays.ONE_WEEK`) with auto-destroy                      |
-| Table billing        | On-demand (`PAY_PER_REQUEST`)                                            |
-| Runtime              | Node.js 22.x                                                             |
-| Timeout              | 10 seconds per Lambda                                                    |
+| Rule            | Detail                                                                          |
+| --------------- | ------------------------------------------------------------------------------- |
+| Resource names  | All derived from `STACK_NAME` prefix via `resourceNames`                        |
+| Lambda handlers | `translateJsonService` handles `POST /translate`                                |
+| Validation      | Translation requests are validated by the Zod schema in `translate.dto.ts`      |
+| Error responses | Use the shared response helpers from `utils.lambda.ts`                          |
+| Local dev       | Express routes mirror Lambda routes via `expressToLambdaEvent()` adapter        |
+| Tests           | Axios integration tests; `randomUUID()` makes each successful test input unique |
+| AWS permissions | Lambda needs `translate:TranslateText` permission                               |
+| Log retention   | 1 week (`RetentionDays.ONE_WEEK`) with auto-destroy                             |
+| Runtime         | Node.js 22.x                                                                    |
+| Timeout         | 60 seconds per Lambda                                                           |
 
 ---
 
-## 17. Adding a New Entity
+## 17. Updating the Translation API
 
-1. Create `src/lib/lambda/<entity>/` with four files: `.dto.ts`, `.model.ts`, `.service.ts`, `.lambda.ts`, `.spec.ts`
-2. Add resource names for the entity to `src/constants/resources.ts`
-3. Add table name env var to `src/constants/environment.ts` and `.env`
-4. Create `src/lib/dynamodb/<entity>.table.ts`
-5. Create `src/lib/gateway/<entity>.gateway.ts` (or reuse existing gateway)
-6. Wire lambdas, routes, permissions, and CORS in `src/stack.ts`
-7. Add routes to `src/api.ts` for local dev
+1. Update the request schema in `src/aws/lambda/translate/translate.dto.ts` when the accepted input changes.
+2. Implement translation behavior in `src/aws/lambda/translate/translate.service.ts`.
+3. Keep the API Gateway route in `src/stack.ts` and the local Express route in `src/api.ts` aligned.
+4. Add or update Axios integration tests in `src/aws/lambda/translate/translate.spec.ts`; use `randomUUID()` in test input when unique data is needed.
+5. Add any required AWS permissions to the Lambda role in `src/stack.ts`.
