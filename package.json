@@ -1,0 +1,33 @@
+{
+  "name": "aws-serveless-json-translator",
+  "private": true,
+  "version": "1.0.0",
+  "repository": "git@github.com:KlessitonRodrigues/aws-serveless-json-translator.git",
+  "author": "klessiton <klessitom@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test"
+  },
+  "dependencies": {
+    "turbo": "^2.8.13"
+  },
+  "packageManager": "yarn@1.22.22",
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "services/*"
+    ],
+    "nohoist": [
+      "**/@aws-sdk/**",
+      "**/aws-cdk",
+      "**/aws-cdk/**",
+      "**/aws-cdk-lib",
+      "**/aws-cdk-lib/**",
+      "**/constructs",
+      "**/constructs/**"
+    ]
+  }
+}
