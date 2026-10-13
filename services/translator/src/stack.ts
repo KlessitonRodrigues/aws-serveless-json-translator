@@ -1,15 +1,15 @@
-import './config/dotenv'; // sort-imports-ignore
+import './config/config.dotenv'; // sort-imports-ignore
 
 import * as cdk from 'aws-cdk-lib';
 import * as gateway from 'aws-cdk-lib/aws-apigateway';
 import * as iam from 'aws-cdk-lib/aws-iam';
 
-import dotenv from './constants/environment';
-import { resourceNames } from './constants/resources';
+import dotenv from './constants/constants.environment';
+import { resourceNames } from './constants/constants.resources';
 import { TranslateAPIGateway } from './aws/gateway/translate.gateway';
 import { TranslateJsonLambda } from './aws/lambda/translate/translate.lambda';
-import { addCorsPreflight } from './utils/aws';
-import { environment } from './utils/lambda';
+import { addCorsPreflight } from './utils/utils.aws';
+import { environment } from './utils/utils.lambda';
 
 export class JsonTranslatorStack extends cdk.Stack {
   constructor(scope: cdk.App, props?: cdk.StackProps) {

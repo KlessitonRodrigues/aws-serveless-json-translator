@@ -2,8 +2,8 @@ import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as nodeLambda from 'aws-cdk-lib/aws-lambda-nodejs';
 
-import { resourceNames } from '../../../constants/resources';
-import { environment } from '../../../utils/lambda';
+import { resourceNames } from '../../../constants/constants.resources';
+import { environment } from '../../../utils/utils.lambda';
 
 export class TranslateJsonLambda extends nodeLambda.NodejsFunction {
   constructor(scope: cdk.Stack, environment: environment, logGroup?: cdk.aws_logs.LogGroup) {

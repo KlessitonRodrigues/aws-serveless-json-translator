@@ -1,4 +1,4 @@
-import dotenv from './environment';
+import dotenv from './constants.environment';
 
 export const resourceNames = {
   translateApiGateway: dotenv.STACK_NAME + '-translate-api-gateway',

@@ -1,5 +1,5 @@
 import { ErrorDto } from '../aws/lambda/common/api.dto';
-import { apiMessages } from '../constants/apiMessages';
+import { apiMessages } from '../constants/constants.messages';
 
 export type APIGatewayHandler = (event: any) => Promise<any>;
 
@@ -27,13 +27,6 @@ export const createResponse = (
   },
 });
 
-export const badRequest = (details: unknown) =>
-  createResponse(400, ErrorDto.create({ ...apiMessages.INVALID_REQUEST, details }));
-
-export const internalError = (err: any) => {
-  console.error(err);
-  return createResponse(
-    500,
-    ErrorDto.create({ details: err?.message, ...apiMessages.INTERNAL_SERVER_ERROR }),
-  );
+export const badRequest = (details: unknown) => {
+  return createResponse(400, ErrorDto.create({ message: apiMessages.INVALID_REQUEST, details }));
 };

@@ -1,37 +1,44 @@
-import { apiMessages } from '../../../constants/apiMessages';
-import {
-  APIGatewayHandler,
-  badRequest,
-  createResponse,
-  internalError,
-} from '../../../utils/lambda';
+import { TranslateClient, TranslateTextCommand } from '@aws-sdk/client-translate';
+
+import dotenv from '../../../constants/constants.environment';
+import { apiMessages } from '../../../constants/constants.messages';
+import { APIGatewayHandler, badRequest, createResponse } from '../../../utils/utils.lambda';
 import { SuccessDto } from '../common/api.dto';
 import { TranslateJsonDto } from './translate.dto';
-import { createTranslator, translateJson } from './translate.engine';
 
 export const translateJsonService: APIGatewayHandler = async event => {
   try {
-    let body: unknown;
-    try {
-      body = JSON.parse(event.body || '{}');
-    } catch {
-      return badRequest('Body must be valid JSON');
-    }
-
+    const body = JSON.parse(event.body || '{}');
     const parsed = TranslateJsonDto.schema.safeParse(body);
     if (!parsed.success) return badRequest(parsed.error.flatten());
 
     const { json, sourceLanguage, targetLanguage } = parsed.data;
-    const { result, translatedCount } = await translateJson(
-      json,
-      createTranslator(sourceLanguage, targetLanguage),
+
+    const separator = ' | ';
+    const jsonObj = JSON.parse(String(json));
+    const jsonStr = Object.values(jsonObj).join(separator);
+
+    const client = new TranslateClient({ region: dotenv.AWS_REGION });
+    const command = new TranslateTextCommand({
+      Text: jsonStr,
+      SourceLanguageCode: sourceLanguage,
+      TargetLanguageCode: targetLanguage,
+    });
+    const response = await client.send(command);
+    const translatedText = response.TranslatedText ?? '';
+
+    const newJsonObj = Object.fromEntries(
+      Object.keys(jsonObj).map((key, index) => [key, translatedText.split(separator)[index] ?? '']),
     );
 
     return createResponse(
       200,
-      SuccessDto.create({ ...apiMessages.SUCCESS, data: { json: result, translatedCount } }),
+      SuccessDto.create({
+        message: apiMessages.SUCCESS,
+        data: { translatedJson: JSON.stringify(newJsonObj) },
+      }),
     );
   } catch (err: any) {
-    return internalError(err);
+    return badRequest(err);
   }
 };

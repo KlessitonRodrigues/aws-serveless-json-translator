@@ -1,7 +1,7 @@
 import './config.dotenv'; // sort-imports-ignore
 
 import { translateJsonService } from '../aws/lambda/translate/translate.service';
-import { expressToLambdaEvent } from '../utils/express';
+import { expressToLambdaEvent } from '../utils/utils.express';
 
 const express = require('express');
 const cors = require('cors');

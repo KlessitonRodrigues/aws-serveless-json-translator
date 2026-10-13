@@ -1,9 +1,9 @@
-import './config/dotenv'; // sort-imports-ignore
+import './config/config.dotenv'; // sort-imports-ignore
 
 import * as bodyparser from 'body-parser';
 
 import * as translateService from './aws/lambda/translate/translate.service';
-import { expressToLambdaEvent } from './utils/express';
+import { expressToLambdaEvent } from './utils/utils.express';
 
 const express = require('express');
 const cors = require('cors');
