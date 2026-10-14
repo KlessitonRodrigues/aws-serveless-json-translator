@@ -7,6 +7,8 @@ import { TranslateJsonDto } from './translate.dto';
 
 describe('Translate API', () => {
   const baseURL = dotenv.TEST_API_URL;
+  console.log(baseURL);
+
   if (!baseURL) throw new Error('missing TEST_API_URL');
   const apiClient = axios.create({ baseURL });
 
