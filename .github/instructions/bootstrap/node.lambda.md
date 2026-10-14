@@ -29,7 +29,7 @@ Replace the generated `package.json`:
 
 ```json
 {
-  "name": "@services/my-service",
+  "name": "@services/aws-serveless-json-translator",
   "version": "0.1.0",
   "private": true,
   "scripts": {
