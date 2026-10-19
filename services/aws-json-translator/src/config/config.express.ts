@@ -10,7 +10,7 @@ const bodyParser = require('body-parser');
 const localRoutes = () => {
   const router = express.Router();
 
-  router.post('/translate/json', expressToLambdaEvent(translateJsonService));
+  router.post('/translate', expressToLambdaEvent(translateJsonService));
   return router;
 };
 
